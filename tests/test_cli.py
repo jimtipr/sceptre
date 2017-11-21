@@ -481,6 +481,56 @@ class TestCli(object):
         mock_get_env.return_value.stacks["vpc"].describe_outputs\
             .assert_called_with()
 
+    @patch("sceptre.cli.os.getcwd")
+    @patch("sceptre.cli.get_env")
+    def test_estimate_template_cost_with_browser(
+            self, mock_get_env, mock_getcwd
+    ):
+        mock_getcwd.return_value = sentinel.cwd
+        mock_get_env.return_value.stacks["vpc"].estimate_template_cost\
+            .return_value = {
+                "Url": "http://example.com",
+                "ResponseMetadata": {
+                    "HTTPStatusCode": 200
+                }
+            }
+
+        result = self.runner.invoke(
+                    cli,
+                    ["estimate-template-cost", "dev", "vpc"]
+                )
+        mock_get_env.return_value.stacks["vpc"].estimate_template_cost.\
+            assert_called_with()
+
+        assert result.output == \
+            "View the estimated cost at: http://example.com\n"
+
+    @patch("sceptre.cli.os.getcwd")
+    @patch("sceptre.cli.get_env")
+    def test_estimate_template_cost_with_no_browser(
+            self, mock_get_env, mock_getcwd
+    ):
+        mock_getcwd.return_value = sentinel.cwd
+        client_error = ClientError(
+            {
+                "Errors":
+                {
+                    "Message": "No Browser",
+                    "Code": "Error",
+                }
+            },
+            "Webbrowser"
+        )
+        mock_get_env.return_value.stacks["vpc"].\
+            estimate_template_cost.side_effect = client_error
+
+        expected_result = str(client_error) + "\n"
+        result = self.runner.invoke(
+                    cli,
+                    ["estimate-template-cost", "dev", "vpc"]
+                )
+        assert result.output == expected_result
+
     @patch("sceptre.cli.get_env")
     def test_describe_stack_outputs_handles_envvar_flag(
             self, mock_get_env
